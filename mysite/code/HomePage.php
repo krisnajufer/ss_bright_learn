@@ -8,20 +8,40 @@ class HomePage_Controller extends Page_Controller
 {
     private static $allowed_actions = array(
         'SearchPropertyForm',
-        'SearchPropertyDo'
     );
 
     public function index(SS_HTTPRequest $request)
     {
         $regions = RegionData::get()->sort('Created', 'DESC')->limit(6);
-
-        $properties = PropertyData::get()->sort('Created', 'DESC')->limit(6);
-
         $articles = ArticlePage::get()->sort('CREATED', 'DESC')->limit(3);
+
+        $properties = PropertyData::get()
+            ->innerJoin('PropertyData_PropertyFacilities', '"PropertyData_PropertyFacilities"."PropertyDataID" = "PropertyData"."ID"')
+            ->innerJoin('PropertyFacilityData', '"PropertyFacilityData"."ID" = "PropertyData_PropertyFacilities"."PropertyFacilityDataID"');
+
+        $data = Convert::raw2sql($request->postVars());
+
+
+        if ($search = $data['Keywords']) {
+            $properties = $properties->filter(array(
+                'Title:PartialMatch' => $search
+            ));
+        }
+
+        if ($type = $data['Type']) {
+            $properties = $properties->filter(array(
+                'PropertyTypeID' => $type
+            ));
+        }
+
+        if ($facility = $data['Facility']) {
+            $properties = $properties
+                ->filter(array('PropertyData_PropertyFacilities.PropertyFacilityDataID' => $facility));
+        }
 
         return array(
             'Regions' => $regions,
-            'Properties' => $properties,
+            'Properties' => $properties->limit(6),
             'Articles' => $articles
         );
     }
@@ -49,7 +69,10 @@ class HomePage_Controller extends Page_Controller
                     ->addExtraClass('btn btn-fullcolor')
             )
         );
-
+        $form->setFormMethod('POST')
+            ->setFormAction($this->Link())
+            ->disableSecurityToken()
+            ->loadDataFrom($this->request->postVars());
         return $form;
     }
 
